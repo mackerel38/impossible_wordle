@@ -718,6 +718,12 @@
             if (totalCandidates <= 2) {
                 const groups = computeFeedbackGroups(guess, gameState.possibleWords);
                 const entries = Array.from(groups.entries()).sort((a,b)=>b[1].length - a[1].length);
+                if (entries.length > 1) {
+                    const nonCorrectEntry = entries.find(([k, v]) => k !== 'correct,correct,correct,correct,correct');
+                    if (nonCorrectEntry) {
+                        return { feedback: nonCorrectEntry[0].split(','), remainingWords: nonCorrectEntry[1] };
+                    }
+                }
                 const sel = entries[0];
                 return { feedback: sel[0].split(','), remainingWords: sel[1] };
             }
