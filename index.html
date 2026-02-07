@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impossible Wordle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 2.5em;
+        }
+
+        .description {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 0.85em;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border: 2px solid #ffc107;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .game-section {
+            display: none;
+        }
+
+        .game-section.active {
+            display: block;
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-rows: repeat(6, 1fr);
+            gap: 5px;
+            margin-bottom: 30px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+        }
+
+        .tile {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid #d3d6da;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2em;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+            border-radius: 5px;
+        }
+
+        .tile.filled {
+            border-color: #878a8c;
+            animation: pop 0.1s ease;
+        }
+
+        .tile.correct {
+            background-color: #6aaa64;
+            border-color: #6aaa64;
+            color: white;
+            animation: flip 0.5s ease;
+        }
+
+        .tile.present {
+            background-color: #c9b458;
+            border-color: #c9b458;
+            color: white;
+            animation: flip 0.5s ease;
+        }
+
+        .tile.absent {
+            background-color: #787c7e;
+            border-color: #787c7e;
+            color: white;
+            animation: flip 0.5s ease;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes flip {
+            0% { transform: rotateX(0); }
+            50% { transform: rotateX(90deg); }
+            100% { transform: rotateX(0); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .keyboard {
+            display: grid;
+            gap: 5px;
+        }
+
+        .keyboard-row {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+
+        .key {
+            background-color: #d3d6da;
+            border: none;
+            border-radius: 5px;
+            padding: 15px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            min-width: 40px;
+            text-transform: uppercase;
+        }
+
+        .key:hover {
+            background-color: #bbb;
+        }
+
+        .key:active {
+            transform: scale(0.95);
+        }
+
+        .key.wide {
+            min-width: 65px;
+            font-size: 0.8em;
+        }
+
+        .key.correct {
+            background-color: #6aaa64;
+            color: white;
+        }
+
+        .key.present {
+            background-color: #c9b458;
+            color: white;
+        }
+
+        .key.absent {
+            background-color: #787c7e;
+            color: white;
+        }
+
+        .message {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 1.2em;
+            font-weight: bold;
+            min-height: 30px;
+        }
+
+        .message.success {
+            color: #6aaa64;
+        }
+
+        .message.error {
+            color: #dc3545;
+        }
+
+        .message.info {
+            color: #667eea;
+        }
+
+        .btn-reset {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-reset:hover {
+            background-color: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .error-section {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background: #f8d7da;
+            border-radius: 10px;
+            color: #721c24;
+            margin-top: 20px;
+        }
+
+        .error-section.active {
+            display: block;
+        }
+
+        .word-count-info {
+            text-align: center;
+            padding: 10px;
+            background: #d4edda;
+            border-radius: 8px;
+            color: #155724;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IMPOSSIBLE WORDLE</h1>
+        <p class="description">
+            このWordleは意地悪です！あなたの推測に応じて、ヒントと矛盾しない範囲で最も難しい答えに変更します。
+        </p>
+
+        <div class="loading" id="loading-section">
+            <div class="loading-spinner"></div>
+            <p>単語リストを読み込んでいます...</p>
+        </div>
+
+        <div class="error-section" id="error-section">
+            <h3>エラーが発生しました</h3>
+            <p id="error-message"></p>
+            <button class="btn-reset" onclick="location.reload()">再読み込み</button>
+        </div>
+
+        <div class="game-section" id="game-section">
+            <div class="word-count-info" id="word-count"></div>
+
+            <div class="message" id="message"></div>
+
+            <div class="game-board" id="game-board"></div>
+
+            <div class="keyboard" id="keyboard"></div>
+
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="games-played">0</div>
+                    <div class="stat-label">プレイ数</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="avg-guesses">0</div>
+                    <div class="stat-label">平均推測回数</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="win-rate">0%</div>
+                    <div class="stat-label">勝率</div>
+                </div>
+            </div>
+
+            <button class="btn-reset" id="reset-btn">新しいゲーム</button>
+        </div>
+    </div>
+
+    <script>
+        let WORD_LIST = [];
+        let gameState = {
+            possibleWords: [],
+            currentRow: 0,
+            currentTile: 0,
+            gameOver: false,
+            guesses: [],
+            letterStates: {}
+        };
+
+        let stats = {
+            gamesPlayed: 0,
+            totalGuesses: 0,
+            gamesWon: 0
+        };
+
+        // GitHubから単語リストを読み込む
+        async function loadWordList() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/stuartpb/wordles/main/nonwordles.json');
+                const response2 = await fetch('https://raw.githubusercontent.com/stuartpb/wordles/main/wordles.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                let words = await response.json();
+		let words2 = await response2.json();
+		Object.assign(words, words2);
+                
+                // 大文字に変換して5文字の単語のみフィルタ
+                WORD_LIST = words
+                    .map(word => word.toUpperCase())
+                    .filter(word => word.length === 5);
+                
+                console.log(`${WORD_LIST.length}語の単語を読み込みました`);
+                
+                document.getElementById('word-count').textContent = 
+                    `✓ ${WORD_LIST.length.toLocaleString()}語の単語を読み込みました`;
+                
+                // ローディングを非表示、ゲームセクションを表示
+                document.getElementById('loading-section').style.display = 'none';
+                document.getElementById('game-section').classList.add('active');
+                
+                loadStats();
+                resetGame();
+            } catch (error) {
+                console.error('単語リストの読み込みエラー:', error);
+                document.getElementById('loading-section').style.display = 'none';
+                document.getElementById('error-section').classList.add('active');
+                document.getElementById('error-message').textContent = 
+                    `単語リストの読み込みに失敗しました: ${error.message}`;
+            }
+        }
+
+        // ゲームボードを初期化
+        function initBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            
+            for (let i = 0; i < 6; i++) {
+                const row = document.createElement('div');
+                row.className = 'row';
+                
+                for (let j = 0; j < 5; j++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'tile';
+                    tile.id = `tile-${i}-${j}`;
+                    row.appendChild(tile);
+                }
+                
+                board.appendChild(row);
+            }
+        }
+
+        // キーボードを初期化
+        function initKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            const keys = [
+                ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+                ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
+                ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', '←']
+            ];
+
+            keyboard.innerHTML = '';
+            
+            keys.forEach(row => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'keyboard-row';
+                
+                row.forEach(key => {
+                    const button = document.createElement('button');
+                    button.className = 'key';
+                    if (key === 'ENTER' || key === '←') {
+                        button.className += ' wide';
+                    }
+                    button.textContent = key;
+                    button.id = `key-${key}`;
+                    button.addEventListener('click', () => handleKey(key));
+                    rowDiv.appendChild(button);
+                });
+                
+                keyboard.appendChild(rowDiv);
+            });
+        }
+
+        // フィードバックを計算（特定の答えに対して）
+        function calculateFeedback(guess, answer) {
+            const feedback = Array(5).fill('absent');
+            const answerLetters = answer.split('');
+            const usedIndices = new Set();
+
+            // まず正確な一致を見つける
+            for (let i = 0; i < 5; i++) {
+                if (guess[i] === answer[i]) {
+                    feedback[i] = 'correct';
+                    usedIndices.add(i);
+                }
+            }
+
+            // 次に存在する文字を見つける
+            for (let i = 0; i < 5; i++) {
+                if (feedback[i] === 'correct') continue;
+
+                for (let j = 0; j < 5; j++) {
+                    if (!usedIndices.has(j) && guess[i] === answer[j]) {
+                        feedback[i] = 'present';
+                        usedIndices.add(j);
+                        break;
+                    }
+                }
+            }
+
+            return feedback;
+        }
+
+        // 最も難しくなるフィードバックパターンを選択
+        function getAdversarialFeedback(guess) {
+            const feedbackGroups = new Map();
+
+            for (let word of gameState.possibleWords) {
+                const feedback = calculateFeedback(guess, word);
+                const key = feedback.join(',');
+                
+                if (!feedbackGroups.has(key)) {
+                    feedbackGroups.set(key, []);
+                }
+                feedbackGroups.get(key).push(word);
+            }
+
+            // 最も多くの候補が残るフィードバックパターンを選択
+            let maxSize = 0;
+            let bestFeedback = null;
+            let bestWords = [];
+
+            for (let [key, words] of feedbackGroups) {
+                if (words.length > maxSize) {
+                    maxSize = words.length;
+                    bestFeedback = key.split(',');
+                    bestWords = words;
+                }
+            }
+
+            return {
+                feedback: bestFeedback,
+                remainingWords: bestWords
+            };
+        }
+
+        // キー入力処理
+        function handleKey(key) {
+            if (gameState.gameOver) return;
+
+            if (key === '←') {
+                deleteLetter();
+            } else if (key === 'ENTER') {
+                submitGuess();
+            } else if (gameState.currentTile < 5) {
+                addLetter(key);
+            }
+        }
+
+        // 文字を追加
+        function addLetter(letter) {
+            if (gameState.currentTile < 5) {
+                const tile = document.getElementById(`tile-${gameState.currentRow}-${gameState.currentTile}`);
+                tile.textContent = letter;
+                tile.classList.add('filled');
+                gameState.currentTile++;
+            }
+        }
+
+        // 文字を削除
+        function deleteLetter() {
+            if (gameState.currentTile > 0) {
+                gameState.currentTile--;
+                const tile = document.getElementById(`tile-${gameState.currentRow}-${gameState.currentTile}`);
+                tile.textContent = '';
+                tile.classList.remove('filled');
+            }
+        }
+
+        // 推測を送信
+        function submitGuess() {
+            if (gameState.currentTile !== 5) {
+                showMessage('5文字入力してください', 'error');
+                return;
+            }
+
+            const guess = getCurrentGuess();
+            
+            if (!WORD_LIST.includes(guess)) {
+                showMessage('辞書にない単語です', 'error');
+                shakeTiles();
+                return;
+            }
+
+            // アダプティブなフィードバックを取得
+            const { feedback, remainingWords } = getAdversarialFeedback(guess);
+
+            // フィードバックを適用
+            flipTiles(guess, feedback);
+            gameState.guesses.push({ word: guess, feedback });
+
+            // 候補単語を更新
+            gameState.possibleWords = remainingWords;
+
+            // 勝利条件: すべてが正解
+            const isWin = feedback.every(f => f === 'correct');
+
+            if (isWin) {
+                setTimeout(() => {
+                    gameState.gameOver = true;
+                    showMessage(`🎉 正解！ ${gameState.currentRow + 1}回で成功！`, 'success');
+                    updateStats(true, gameState.currentRow + 1);
+                }, 1500);
+            } else if (gameState.currentRow === 5) {
+                setTimeout(() => {
+                    gameState.gameOver = true;
+                    const finalWord = gameState.possibleWords[0] || '不明';
+                    showMessage(`敗北... 正解候補: ${finalWord}`, 'error');
+                    updateStats(false, 6);
+                }, 1500);
+            } else {
+                gameState.currentRow++;
+                gameState.currentTile = 0;
+            }
+        }
+
+        // 現在の推測を取得
+        function getCurrentGuess() {
+            let guess = '';
+            for (let i = 0; i < 5; i++) {
+                const tile = document.getElementById(`tile-${gameState.currentRow}-${i}`);
+                guess += tile.textContent;
+            }
+            return guess;
+        }
+
+        // タイルをフリップしてカラーリング
+        function flipTiles(guess, feedback) {
+            const tiles = [];
+
+            for (let i = 0; i < 5; i++) {
+                const tile = document.getElementById(`tile-${gameState.currentRow}-${i}`);
+                tiles.push(tile);
+            }
+
+            tiles.forEach((tile, i) => {
+                setTimeout(() => {
+                    tile.classList.add(feedback[i]);
+                    updateKeyboard(guess[i], feedback[i]);
+                }, i * 300);
+            });
+        }
+
+        // キーボードの色を更新
+        function updateKeyboard(letter, state) {
+            const key = document.getElementById(`key-${letter}`);
+            if (!key) return;
+
+            const currentState = gameState.letterStates[letter];
+            
+            if (!currentState || 
+                (state === 'correct') ||
+                (state === 'present' && currentState !== 'correct')) {
+                gameState.letterStates[letter] = state;
+                key.classList.remove('correct', 'present', 'absent');
+                key.classList.add(state);
+            }
+        }
+
+        // タイルを揺らす
+        function shakeTiles() {
+            for (let i = 0; i < 5; i++) {
+                const tile = document.getElementById(`tile-${gameState.currentRow}-${i}`);
+                tile.style.animation = 'shake 0.5s';
+                setTimeout(() => {
+                    tile.style.animation = '';
+                }, 500);
+            }
+        }
+
+        // メッセージを表示
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type}`;
+            setTimeout(() => {
+                if (!gameState.gameOver) {
+                    message.textContent = '';
+                    message.className = 'message';
+                }
+            }, 3000);
+        }
+
+        // 統計を更新
+        function updateStats(won, guesses) {
+            stats.gamesPlayed++;
+            stats.totalGuesses += guesses;
+            if (won) {
+                stats.gamesWon++;
+            }
+            saveStats();
+            updateStatsDisplay();
+        }
+
+        // 統計表示を更新
+        function updateStatsDisplay() {
+            document.getElementById('games-played').textContent = stats.gamesPlayed;
+            const avgGuesses = stats.gamesPlayed > 0 
+                ? (stats.totalGuesses / stats.gamesPlayed).toFixed(1) 
+                : 0;
+            document.getElementById('avg-guesses').textContent = avgGuesses;
+            const winRate = stats.gamesPlayed > 0 
+                ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100) 
+                : 0;
+            document.getElementById('win-rate').textContent = winRate + '%';
+        }
+
+        // 統計を保存
+        function saveStats() {
+            localStorage.setItem('impossibleWordleStats', JSON.stringify(stats));
+        }
+
+        // 統計を読み込む
+        function loadStats() {
+            const saved = localStorage.getItem('impossibleWordleStats');
+            if (saved) {
+                stats = JSON.parse(saved);
+            }
+            updateStatsDisplay();
+        }
+
+        // ゲームをリセット
+        function resetGame() {
+            gameState = {
+                possibleWords: [...WORD_LIST],
+                currentRow: 0,
+                currentTile: 0,
+                gameOver: false,
+                guesses: [],
+                letterStates: {}
+            };
+            
+            initBoard();
+            initKeyboard();
+            document.getElementById('message').textContent = '';
+        }
+
+        // キーボードイベント
+        document.addEventListener('keydown', (e) => {
+            if (gameState.gameOver) return;
+            
+            if (e.key === 'Enter') {
+                handleKey('ENTER');
+            } else if (e.key === 'Backspace') {
+                handleKey('←');
+            } else if (/^[a-zA-Z]$/.test(e.key)) {
+                handleKey(e.key.toUpperCase());
+            }
+        });
+
+        // リセットボタン
+        document.getElementById('reset-btn').addEventListener('click', resetGame);
+
+        // ページ読み込み時に単語リストを取得
+        loadWordList();
+    </script>
+</body>
+</html>
