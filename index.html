@@ -714,19 +714,50 @@
         }
 
         function getAdversarialFeedback(guess) {
+            const FULL_MINIMAX_THRESHOLD = 50;
+        
             const totalCandidates = gameState.possibleWords.length;
-            if (totalCandidates <= 2) {
-                const groups = computeFeedbackGroups(guess, gameState.possibleWords);
-                const entries = Array.from(groups.entries()).sort((a,b)=>b[1].length - a[1].length);
-                if (entries.length > 1) {
-                    const nonCorrectEntry = entries.find(([k, v]) => k !== 'correct,correct,correct,correct,correct');
-                    if (nonCorrectEntry) {
-                        return { feedback: nonCorrectEntry[0].split(','), remainingWords: nonCorrectEntry[1] };
+        
+            if (totalCandidates <= FULL_MINIMAX_THRESHOLD) {
+                const feedbackGroups = computeFeedbackGroups(guess, gameState.possibleWords);
+                const entries = Array.from(feedbackGroups.entries());
+        
+                let bestScore = -Infinity;
+                let bestEntry = null;
+        
+                for (let [k, words] of entries) {
+                    if (AVOID_IMMEDIATE_CORRECT && k === 'correct,correct,correct,correct,correct' && entries.length > 1) {
+                        continue;
+                    }
+        
+                    let playerBest = Infinity;
+        
+                    for (let g of WORD_LIST) {
+                        const groups2 = computeFeedbackGroups(g, words);
+                        const sizes = Array.from(groups2.values()).map(a => a.length);
+                        const maxGroup = sizes.length ? Math.max(...sizes) : 0;
+        
+                        if (maxGroup < playerBest) playerBest = maxGroup;
+        
+                        if (playerBest <= 1) break;
+                    }
+        
+                    const score = playerBest + words.length * 1e-6;
+        
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestEntry = { key: k, words };
                     }
                 }
-                const sel = entries[0];
+        
+                if (bestEntry) {
+                    return { feedback: bestEntry.key.split(','), remainingWords: bestEntry.words };
+                }
+                const sorted = entries.sort((a,b)=>b[1].length - a[1].length);
+                const sel = sorted[0];
                 return { feedback: sel[0].split(','), remainingWords: sel[1] };
             }
+        
             if (totalCandidates > 1200) {
                 const groups = computeFeedbackGroups(guess, gameState.possibleWords);
                 const entries = Array.from(groups.entries()).sort((a,b)=>b[1].length - a[1].length);
@@ -735,31 +766,42 @@
                     return { feedback: k.split(','), remainingWords: words };
                 }
             }
+        
             const feedbackGroups = computeFeedbackGroups(guess, gameState.possibleWords);
             let feedbackEntries = Array.from(feedbackGroups.entries()).map(([k,v]) => ({k, words: v}));
             feedbackEntries.sort((a,b) => b.words.length - a.words.length);
+        
             feedbackEntries = feedbackEntries.slice(0, Math.max(3, Math.min(MAX_CANDIDATE_FEEDBACKS, feedbackEntries.length)));
+        
             let bestMeasure = -1;
             let bestEntry = null;
+        
             for (let entry of feedbackEntries) {
                 const words = entry.words;
+        
                 if (AVOID_IMMEDIATE_CORRECT && entry.k === 'correct,correct,correct,correct,correct' && feedbackEntries.length > 1) {
                     continue;
                 }
+        
                 const estimatedWorstAfterPlayer = evaluatePlayerBestResponse(words);
+        
                 let score = estimatedWorstAfterPlayer;
                 score += words.length * 0.001;
+        
                 if (Math.random() < RANDOMIZE_PROB) score *= (1 + Math.random() * 0.05);
+        
                 if (score > bestMeasure) {
                     bestMeasure = score;
                     bestEntry = entry;
                 }
             }
+        
             if (!bestEntry) {
                 const entries = Array.from(feedbackGroups.entries()).sort((a,b)=>b[1].length - a[1].length);
                 const sel = entries[0];
                 return { feedback: sel[0].split(','), remainingWords: sel[1] };
             }
+        
             return { feedback: bestEntry.k.split(','), remainingWords: bestEntry.words };
         }
         function updateDebugInfo(patternCount, maxGroupSize, entropy) {
